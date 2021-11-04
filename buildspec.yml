@@ -2,8 +2,13 @@ version: 0.2
 phases:
   build:
     commands:    
-      - zip -r Deployment.zip appspec.yml configs/ helloworld.py scripts/ wsgi.py requirements.txt
+      -
    
 artifacts:
   files:
-    - Deployment.zip
+    - appspec.yml
+    - configs/*
+    - helloworld.py
+    - scripts/*
+    - wsgi.py
+    - requirements.txt
