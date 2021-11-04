@@ -6,7 +6,7 @@ def hello():
     return "<h1>Hello World!</h1>"
 
 @app.route("/hellodevops")
-def hello():
+def hellodevops():
     return "<h1>Hello Edinburgh DevOps!</h1>"
 
 if __name__ == "__main__":
