@@ -1,0 +1,209 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  UserGroup Pipeline CloudFormation Example
+Parameters:
+  GitHubConnectionARN:
+    Type: String
+    Description: "CodeStar connection ARN"
+    NoEcho: True
+    Default: ''
+  GitHubRepo:
+    Type: String
+    Description: The repo name of the sample service.    
+  GitHubBranch:
+    Type: String
+    Description: The branch of the repo to continuously deploy.  
+    Default: 'main'      
+  PipelineName:
+    Description: A name for pipeline
+    Type: String  
+    Default: 'UserGroupPipelineCF'     
+  CodeDeployServiceRole:
+    Type: String
+    Description: ARN for CodeDeploy Service Role
+    NoEcho: True
+  EC2InstanceTagKey:
+    Type: String
+    Description: 'Tag Name to look for in instance'
+  EC2InstanceTagValue:
+    Type: String
+    Description: 'Value to look for in tagged instance'
+
+Resources:
+
+  ArtifactStoreBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        {
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": { "Service": [ "codebuild.amazonaws.com" ]},
+                "Action": [ "sts:AssumeRole" ]
+            }]
+        }
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+              - Resource: !Sub arn:aws:s3:::${ArtifactStoreBucket}/*
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:GetObjectVersion
+
+  PipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+        - PolicyName: CodePipelineAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - s3:*
+                  - cloudformation:*
+                  - iam:PassRole
+                  - sns:Publish
+                  - lambda:*
+                  - codebuild:*
+                  - codestar-connections:*
+                  - codedeploy:*
+                Effect: Allow
+                Resource: '*'
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      ServiceRole: !Ref CodeBuildServiceRole
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+      Source:
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 15
+      Name: !Ref PipelineName
+
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Sub 'CodeDeployApplication-${PipelineName}'
+      ComputePlatform: 'Server'
+
+  CodeDeployDeploymentConfig:
+    DependsOn:
+      - 'CodeDeployApplication'
+    Type: AWS::CodeDeploy::DeploymentConfig
+    Properties: 
+      ComputePlatform: 'Server'
+      DeploymentConfigName: !Sub 'CodeDeployConfig-${PipelineName}'
+      MinimumHealthyHosts: 
+        Type: 'HOST_COUNT'
+        Value: 1
+
+  CodeDeployDeploymentGroup:
+    DependsOn:
+      - 'CodeDeployApplication'
+      - 'CodeDeployDeploymentConfig'
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:   
+      ApplicationName: !Sub 'CodeDeployApplication-${PipelineName}'
+      DeploymentGroupName: !Sub 'CodeDeployDeploymentGroup-${PipelineName}'
+      DeploymentConfigName: 'CodeDeployDefault.AllAtOnce'
+      DeploymentStyle: 
+        DeploymentOption: 'WITHOUT_TRAFFIC_CONTROL'
+        DeploymentType: 'IN_PLACE'
+      Ec2TagFilters: 
+        - Key: !Ref EC2InstanceTagKey
+          Type: KEY_AND_VALUE
+          Value: !Ref EC2InstanceTagValue
+      ServiceRoleArn: !Ref CodeDeployServiceRole
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Location: !Ref 'ArtifactStoreBucket'
+        Type: S3
+      DisableInboundStageTransitions: []
+      Name: !Ref PipelineName
+      RoleArn: !GetAtt 'PipelineRole.Arn'
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GitHubSource
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeStarSourceConnection
+              Configuration:                
+                ConnectionArn: !Ref GitHubConnectionARN
+                FullRepositoryId: !Ref GitHubRepo
+                BranchName: !Ref GitHubBranch                
+              OutputArtifacts:
+                - Name: SourceArtifact
+              RunOrder: '1'
+
+        - Name: Build
+          Actions:
+            - Name: Build
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              RunOrder: '2'
+
+        - Name: Deploy
+          Actions:
+            - Name: Deploy
+              InputArtifacts:
+                - Name: BuildArtifact
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CodeDeploy
+                Version: 1
+              OutputArtifacts: []
+              Configuration:
+                ApplicationName: !Sub 'CodeDeployApplication-${PipelineName}'
+                DeploymentGroupName: !Sub 'CodeDeployDeploymentGroup-${PipelineName}'
+              RunOrder: '3'      
+              
