@@ -3,6 +3,8 @@
 echo "Services"
 
 echo "Copy service file"
+rm /etc/systemd/system/helloworld.service
+rm /etc/nginx/sites-available/helloworld
 cp /var/html/helloworld/configs/helloworld.service /etc/systemd/system/helloworld.service
 cp /var/html/helloworld/configs/helloworld /etc/nginx/sites-available/helloworld
 
