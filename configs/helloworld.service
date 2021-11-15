@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 User=nginx
-Group=ngxinx
+Group=nginx
 WorkingDirectory=/var/html/helloworld
 Environment="PATH=/var/html/helloworld/"
 ExecStart=/usr/local/bin/uwsgi --ini-paste-logged /var/html/helloworld/configs/helloworld.ini
