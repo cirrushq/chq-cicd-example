@@ -1,0 +1,124 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: EC2 instance with uwsgi and NGINX
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: 1. General
+        Parameters:
+          - BucketName
+          - BucketRegion
+          - BucketFolder
+          - ApplicationName          
+          - Environment
+      - Label:
+          default: 2. VPC/Network Configuration
+        Parameters:
+          - CIDRBase
+
+Parameters:
+  ## General
+  CIDRBase:
+    Default: 10.88.0.0/16
+    Type: String
+    Description: Base CIDR range for VPC (be wary of overlapping other Environments)
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+  BucketName:
+    Type: String
+    Description: S3 bucket name
+  BucketRegion:
+    Type: String
+    Description: S3 bucket regionn
+  BucketFolder:
+    Type: String
+    Description: Folder Name where CF templates are stored. No trailing slash.
+  ApplicationName:
+    Type: String
+    Description: Name of application - will be used as tags and in name values
+  Environment:
+    Type: String
+    Description: Name of Environment - will be used as tags and in name values
+    Default: 'dev'
+  SSHAccessIP:
+    Type: String
+    Description: Source IP Address for SSH Access
+  KeyPairName:
+    Type: String
+    Description: Name of EC2 Key Pair
+
+Resources:
+  # VPC
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:
+        !Join ['', ['https://', !Ref BucketName, '.s3.', !Ref BucketRegion, '.amazonaws.com/', !Ref BucketFolder, '/vpc.yml']]
+      TimeoutInMinutes: 20
+      Parameters:
+        Environment: !Ref Environment
+        ApplicationName: !Ref ApplicationName
+        CIDRBase: !Ref CIDRBase
+
+  # Subnets
+  SubnetStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:
+        !Join ['', ['https://', !Ref BucketName, '.s3.', !Ref BucketRegion, '.amazonaws.com/', !Ref BucketFolder, '/subnets.yml']]
+      TimeoutInMinutes: 20
+      Parameters:
+        Environment: !Ref Environment
+        ApplicationName: !Ref ApplicationName
+        CIDRBase: !Ref CIDRBase
+        VPC: !GetAtt
+          - VPCStack
+          - Outputs.VPC
+        PublicRouteTable: !GetAtt
+          - VPCStack
+          - Outputs.PublicRouteTable
+        PrivateRouteTable: !GetAtt
+          - VPCStack
+          - Outputs.PrivateRouteTable
+        NetworkAcl: !GetAtt
+          - VPCStack
+          - Outputs.NetworkAcl
+
+  # SecurityGroups
+  SecurityGroupsStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:        
+        !Join ['', ['https://', !Ref BucketName, '.s3.', !Ref BucketRegion, '.amazonaws.com/', !Ref BucketFolder, '/security-groups.yml']]
+      TimeoutInMinutes: 20
+      Parameters:
+        Environment: !Ref Environment
+        ApplicationName: !Ref ApplicationName
+        SSHAccessIP: !Ref SSHAccessIP
+        VPC: !GetAtt
+          - VPCStack
+          - Outputs.VPC
+
+  # EC2 Instannce
+  EC2Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:        
+        !Join ['', ['https://', !Ref BucketName, '.s3.', !Ref BucketRegion, '.amazonaws.com/', !Ref BucketFolder, '/ec2.yml']]
+      TimeoutInMinutes: 20
+      Parameters:
+        AppSubnet: !GetAtt
+          - SubnetStack
+          - Outputs.AppSubnetA
+        SecurityGroup: !GetAtt
+          - SecurityGroupsStack
+          - Outputs.AppDefaultSG
+        Environment: !Ref Environment
+        ApplicationName: !Ref ApplicationName
+        KeyPairName: !Ref KeyPairName
+
+Outputs:
+  VPCId:        
+    Description: VPC ID
+    Value: !GetAtt
+          - VPCStack
+          - Outputs.VPC

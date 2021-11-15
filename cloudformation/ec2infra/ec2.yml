@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Security Groups template
+Parameters:   
+  AppSubnet:
+    Description: Subnet ID
+    Type: 'AWS::EC2::Subnet::Id'
+  SecurityGroup:
+    Description: App Security Group ID
+    Type: String
+  Environment:
+    Description: Environment - dev/uat/prod/preprod etc
+    Type: String
+  ApplicationName:
+    Description: ApplicationName
+    Type: String
+  KeyPairName:
+    Description: Key Pair Name
+    Type: String
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'         
+  
+Resources:
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:          
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
+      Path: /
+    
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref 'Role'
+  WebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            Encrypted: true
+            VolumeSize: 8
+      ImageId: !Ref LatestAmiId
+      InstanceType: t3.small
+      IamInstanceProfile: !Ref 'InstanceProfile'
+      KeyName: !Ref KeyPairName
+      SubnetId: !Ref AppSubnet
+      SecurityGroupIds:
+        - Ref: SecurityGroup
+      UserData: !Base64
+        Fn::Join:
+          - ''
+          - - "#!/bin/bash -ex\n"
+            - "yum -y update\n"
+            - "yum -y install ruby\n"
+            - "yum -y install wget\n"
+            - "cd /home/ec2-user/\n"
+            - "wget 'https://aws-codedeploy-eu-west-1.s3.eu-west-1.amazonaws.com/latest/install'\n"
+            - "chmod +x ./install\n"
+            - "./install auto\n"
+            - "amazon-linux-extras install -y nginx1\n"
+            - "yum groupinstall -y 'Development Tools'\n"
+            - "yum -y install python3-devel\n"
+            - "pip3 install wheel\n"
+            - "pip3 install uwsgi\n"     
+      Tags:
+        - Key: Name
+          Value: !Ref ApplicationName
+        - Key: Environment
+          Value: !Ref 'Environment'

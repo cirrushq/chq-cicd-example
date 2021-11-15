@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Security Groups template
+Parameters:
+  VPC:
+    Description: Existing VPC ID
+    Type: 'AWS::EC2::VPC::Id'    
+  Environment:
+    Description: Environment - dev/uat/prod/preprod etc
+    Type: String
+  ApplicationName:
+    Description: ApplicationName
+    Type: String
+  SSHAccessIP:
+    Description: IP Address for SSH Access
+    Type: String
+
+Resources:
+  # Security Groups
+  # APP SG
+  AppDefaultSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Join 
+        - '-'
+        - - App
+          - !Ref ApplicationName
+          - !Ref Environment
+          - DefaultSG
+      GroupDescription: !Join 
+        - '-'
+        - - App
+          - !Ref ApplicationName
+          - !Ref Environment
+          - DefaultSG
+      SecurityGroupIngress:
+          - IpProtocol: tcp
+            Description: 'Port 80 HTTP Only'
+            FromPort: 80
+            ToPort: 80
+            CidrIp: 0.0.0.0/0
+          - IpProtocol: tcp
+            Description: 'SSH Access'
+            FromPort: 22
+            ToPort: 22
+            CidrIp: !Ref SSHAccessIP
+      Tags:
+        - Key: Name
+          Value: !Join 
+            - '-'
+            - - App
+              - !Ref ApplicationName
+              - !Ref Environment
+              - DefaultSG
+      VpcId: !Ref VPC
+
+Outputs:
+  AppDefaultSG:
+    Description: App Default SG
+    Value: !Ref AppDefaultSG

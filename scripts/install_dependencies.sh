@@ -3,4 +3,4 @@
 echo "Dependencies"
 
 ls -l
-apt install -y python3-pip
+yum install -y python3-pip
