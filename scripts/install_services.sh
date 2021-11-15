@@ -6,10 +6,9 @@ echo "Copy service file"
 rm -f /etc/systemd/system/helloworld.service
 rm -f /etc/nginx/sites-available/helloworld
 cp /var/html/helloworld/configs/helloworld.service /etc/systemd/system/helloworld.service
-cp /var/html/helloworld/configs/helloworld /etc/nginx/sites-available/helloworld
+cp /var/html/helloworld/configs/helloworld /etc/nginx/conf.d/
 
-ln -sf /etc/nginx/sites-available/helloworld /etc/nginx/sites-enabled
-chown -R www-data:www-data /var/html/helloworld/
+chown -R nginx:nginx /var/html/helloworld/
 
 echo "Install python requirements"
 pip3 install -r /var/html/helloworld/requirements.txt

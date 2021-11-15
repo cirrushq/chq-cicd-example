@@ -10,4 +10,4 @@ Environment="PATH=/var/html/helloworld/"
 ExecStart=/usr/local/bin/uwsgi --ini-paste-logged /var/html/helloworld/configs/helloworld.ini
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-user.targett
