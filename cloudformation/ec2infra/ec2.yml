@@ -52,7 +52,7 @@ Resources:
             Encrypted: true
             VolumeSize: 8
       ImageId: !Ref LatestAmiId
-      InstanceType: t3.small
+      InstanceType: t3.micro
       IamInstanceProfile: !Ref 'InstanceProfile'
       KeyName: !Ref KeyPairName
       SubnetId: !Ref AppSubnet
