@@ -3,6 +3,8 @@ CI/CD Deployment Example
 
 This example repository will take you through the steps required to set up a CI/CD pipeline on AWS, connecting a GitHub repository to CodePipeline and deploying a small hellow world Flask App onto an EC2 instance running via uwsgi and Nginx.
 
+This repository is provided as-is with no assumption of support from CirrusHQ, though if possible we will answer questions raised as issues. Deploying these CloudFormation templates will result in resources being created in AWS, such as an EC2 instance (a t3.micro), a nat gateway, an s3 bucket and a few more entries. Costs should be low, but do keep an eye on them.
+
 This repository is linked to a webinar, which can be watched here [CI/CD Pipeline Webinar](https://www.cirrushq.com/webinar-delivery-of-higher-quality-software-faster-with-a-step-by-step-guide-on-creating-a-ci-cd-pipeline/). Slides are also available on this page that cover creating a CI/CD pipeline and why you would want to.
 
 This repository contains the following:
